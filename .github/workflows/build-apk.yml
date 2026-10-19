@@ -1,0 +1,54 @@
+name: build-apk
+
+# Compila el APK desde el codigo (NDK + CMake + Gradle) y lo deja como artefacto.
+# Se dispara con cada push a main o a mano desde la pestana Actions.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Instalar NDK 29 y piezas del SDK
+        run: |
+          set -euo pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "ndk;29.0.14206865" "platforms;android-35" "build-tools;35.0.1"
+
+      - name: Compilar el juego (nativo)
+        run: |
+          set -euo pipefail
+          # El runner trae su propio ANDROID_NDK_HOME; hay que forzar el NDK 29.
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/29.0.14206865"
+          sh smstrikers-port/tools/build-android.sh
+
+      - name: Empaquetar el APK
+        working-directory: smstrikers-port/android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Guardar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: strikers-apk
+          path: smstrikers-port/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+      - name: Guardar log de compilacion si fallo
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compile-log
+          path: smstrikers-port/build-android/compile.log
+          if-no-files-found: ignore
