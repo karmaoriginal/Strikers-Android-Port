@@ -36,7 +36,7 @@ jobs:
 
       - name: Empaquetar el APK
         working-directory: smstrikers-port/android
-        run: ./gradlew assembleRelease --no-daemon
+        run: sh ./gradlew assembleRelease --no-daemon
 
       - name: Guardar APK
         uses: actions/upload-artifact@v4
