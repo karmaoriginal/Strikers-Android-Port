@@ -24,6 +24,7 @@ namespace {
 // is invisible, while a UI thread that blocks on the game's loop is a dropped
 // touch the player feels.
 std::atomic<int> s_buttons{0};
+std::atomic<int> s_latched{0};  // toques que ainda nao foram lidos por um quadro do jogo
 std::atomic<int> s_triggerL{0};      // 0..255
 std::atomic<int> s_triggerR{0};
 std::atomic<int> s_stickX{0};        // -32767..32767
@@ -139,6 +140,7 @@ void detach()
     // Everything released first: a detach with a button held leaves the game
     // holding it.
     s_buttons.store(0, std::memory_order_relaxed);
+    s_latched.store(0, std::memory_order_relaxed);
     s_triggerL.store(0, std::memory_order_relaxed);
     s_triggerR.store(0, std::memory_order_relaxed);
     s_stickX.store(0, std::memory_order_relaxed);
@@ -159,7 +161,7 @@ void push_state()
     if (s_virtual == nullptr)
         return;
 
-    const int b = s_buttons.load(std::memory_order_relaxed);
+    const int b = s_buttons.load(std::memory_order_relaxed) | s_latched.exchange(0, std::memory_order_relaxed);
 
     SDL_SetJoystickVirtualButton(s_virtual, SDL_GAMEPAD_BUTTON_SOUTH, (b & TOUCH_A) != 0);
     SDL_SetJoystickVirtualButton(s_virtual, SDL_GAMEPAD_BUTTON_EAST, (b & TOUCH_B) != 0);
@@ -265,7 +267,12 @@ extern "C" JNIEXPORT void JNICALL
 Java_io_github_newcoke_strikers_Toque_enviar(JNIEnv*, jclass, jint botoes, jint gatilhoEsq,
                                              jint gatilhoDir, jint lx, jint ly, jint cx, jint cy)
 {
-    s_buttons.store((int)botoes, std::memory_order_relaxed);
+    {
+        // Um toque curto nao pode se perder entre dois quadros quando o jogo roda lento:
+        // cada botao recem-apertado fica pendente ate o proximo quadro le-lo.
+        const int antes = s_buttons.exchange((int)botoes, std::memory_order_relaxed);
+        s_latched.fetch_or((int)botoes & ~antes, std::memory_order_relaxed);
+    }
     s_triggerL.store((int)gatilhoEsq, std::memory_order_relaxed);
     s_triggerR.store((int)gatilhoDir, std::memory_order_relaxed);
     s_stickX.store((int)lx, std::memory_order_relaxed);
