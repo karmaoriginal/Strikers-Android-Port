@@ -271,6 +271,8 @@ Java_io_github_newcoke_strikers_Toque_enviar(JNIEnv*, jclass, jint botoes, jint 
         // Um toque curto nao pode se perder entre dois quadros quando o jogo roda lento:
         // cada botao recem-apertado fica pendente ate o proximo quadro le-lo.
         const int antes = s_buttons.exchange((int)botoes, std::memory_order_relaxed);
+        if ((int)botoes != antes)
+            std::fprintf(stderr, "[touch] botoes 0x%x -> 0x%x\n", (unsigned)antes, (unsigned)botoes);
         s_latched.fetch_or((int)botoes & ~antes, std::memory_order_relaxed);
     }
     s_triggerL.store((int)gatilhoEsq, std::memory_order_relaxed);

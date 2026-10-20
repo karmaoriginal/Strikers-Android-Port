@@ -72,6 +72,11 @@ public class OverlayView extends View {
                 final float alcance = raio * 1.25f;
                 return dx * dx + dy * dy <= alcance * alcance;
             }
+            if ("START".equals(rotulo) || "BACK".equals(rotulo)) {
+                // Pastilhas pequenas coladas na borda de baixo: o alvo cresce para cima.
+                final float m = caixa.height() * 0.9f;
+                return x >= caixa.left && x <= caixa.right && y >= caixa.top - m && y <= caixa.bottom + m;
+            }
             return caixa.contains(x, y);
         }
     }
