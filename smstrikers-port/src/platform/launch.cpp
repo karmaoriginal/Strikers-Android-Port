@@ -171,7 +171,7 @@ extern "C" void PortAuroraConfigure(AuroraConfig* cfg)
 
     cfg->logCallback = AuroraLog;
 
-#if defined(__linux__)
+#if defined(__linux__) && !defined(__ANDROID__)
     // Dawn's EGL swap chain cannot present to a Wayland surface, so the GL backends go through XWayland.
     if (cfg->desiredBackend == BACKEND_OPENGL || cfg->desiredBackend == BACKEND_OPENGLES)
         SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "x11,wayland");
