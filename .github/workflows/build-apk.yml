@@ -37,12 +37,14 @@ jobs:
       - name: Firma estable entre compilaciones
         uses: actions/cache@v4
         with:
-          path: ~/.android/debug.keystore
+          path: ~/strikers-android-home/debug.keystore
           key: debug-keystore-v1
 
       - name: Empaquetar el APK
         working-directory: smstrikers-port/android
-        run: sh ./gradlew assembleRelease --no-daemon
+        env:
+          ANDROID_USER_HOME: /home/runner/strikers-android-home
+        run: mkdir -p "$ANDROID_USER_HOME" && sh ./gradlew assembleRelease --no-daemon
 
       - name: Guardar APK
         uses: actions/upload-artifact@v4
