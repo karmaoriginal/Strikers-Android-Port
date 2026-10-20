@@ -74,8 +74,7 @@ final class Configuracao {
         // quiser o antigo com o menu de depuracao junto.
         chaves.put("overlay", null);
 
-        // O backend continua sendo vulkan sempre: é o único que o Dawn tem aqui.
-        chaves.put("backend", "vulkan");
+        // O backend não é do menu: fica como está no ini (vulkan, opengles...).
 
         return reescrever(new File(StrikersHome.homeDir(ctx), "strikers.ini"), chaves);
     }

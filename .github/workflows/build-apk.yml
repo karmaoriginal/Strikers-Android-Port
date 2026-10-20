@@ -34,6 +34,12 @@ jobs:
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/29.0.14206865"
           sh smstrikers-port/tools/build-android.sh
 
+      - name: Firma estable entre compilaciones
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: debug-keystore-v1
+
       - name: Empaquetar el APK
         working-directory: smstrikers-port/android
         run: sh ./gradlew assembleRelease --no-daemon
