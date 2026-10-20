@@ -14,6 +14,16 @@
 #include "port/host.h"
 #include "port/region.h"
 
+// Diagnostico: quanto o jogo gasta lendo o disco (bytes, tempo, chamadas). Lido por benchmark.c.
+static unsigned long long s_dvdBytes, s_dvdNs, s_dvdCalls;
+void PortDiscGetStats(unsigned long long* bytes, unsigned long long* us, unsigned long long* calls);
+void PortDiscGetStats(unsigned long long* bytes, unsigned long long* us, unsigned long long* calls)
+{
+    *bytes = s_dvdBytes;
+    *us = s_dvdNs / 1000ull;
+    *calls = s_dvdCalls;
+}
+
 void OSReport(const char* msg, ...);
 
 // Defined below; DVDInit uses it to check that the directory it found is this game's disc rather
@@ -519,8 +529,14 @@ s32 DVDReadAsyncPrio(DVDFileInfo* fileInfo, void* addr, s32 length, s32 offset,
             u32 avail = e->length - at;
             size_t want = (size_t)length < (size_t)avail ? (size_t)length
                                                          : (size_t)avail;
-            got = (s32)port_disc_read(s_disc, addr, want,
-                                      (unsigned long long)e->offset + at);
+            {
+                const unsigned long long t0 = port_monotonic_ns();
+                got = (s32)port_disc_read(s_disc, addr, want,
+                                          (unsigned long long)e->offset + at);
+                s_dvdNs += port_monotonic_ns() - t0;
+                s_dvdBytes += (got > 0) ? (unsigned long long)got : 0ull;
+                s_dvdCalls++;
+            }
         }
     }
     else

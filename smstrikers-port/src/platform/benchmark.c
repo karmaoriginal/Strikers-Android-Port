@@ -271,6 +271,47 @@ void PortBenchGetLive(PortBenchLive* out)
     }
 }
 
+// Diagnostico: uma linha a cada ~5 s no log com o que o jogo esta fazendo (fps, tempo de quadro,
+// tempo ocupado, pior quadro e leitura do disco). Mostra se o gargalo e CPU, GPU ou disco.
+extern void PortDiscGetStats(unsigned long long* bytes, unsigned long long* us, unsigned long long* calls);
+static unsigned long long s_plT0, s_plFrames, s_plBusy, s_plFrame, s_plWorst;
+static unsigned long long s_plDiscB, s_plDiscUs, s_plDiscN;
+
+static void bench_periodic_log(unsigned long long nowNs, unsigned int busyUs, unsigned int frameUs)
+{
+    unsigned long long b, us, n;
+    double secs, frames;
+
+    if (s_plT0 == 0)
+    {
+        s_plT0 = nowNs;
+        PortDiscGetStats(&s_plDiscB, &s_plDiscUs, &s_plDiscN);
+        return;
+    }
+    s_plFrames++;
+    s_plBusy += busyUs;
+    s_plFrame += frameUs;
+    if (frameUs > s_plWorst)
+        s_plWorst = frameUs;
+    if (nowNs - s_plT0 < 5000000000ull)
+        return;
+
+    PortDiscGetStats(&b, &us, &n);
+    secs = (double)(nowNs - s_plT0) / 1e9;
+    frames = (double)(s_plFrames ? s_plFrames : 1);
+    fprintf(stderr,
+            "[perf] %.1f fps | frame %.1f ms | busy %.1f ms | worst %.0f ms | disc +%.1f MB in %llu reads, %.0f ms | match=%d\n",
+            (double)s_plFrames / secs, (double)s_plFrame / frames / 1000.0,
+            (double)s_plBusy / frames / 1000.0, (double)s_plWorst / 1000.0,
+            (double)(b - s_plDiscB) / 1048576.0, n - s_plDiscN, (double)(us - s_plDiscUs) / 1000.0,
+            s_matchActive);
+    s_plT0 = nowNs;
+    s_plFrames = s_plBusy = s_plFrame = s_plWorst = 0;
+    s_plDiscB = b;
+    s_plDiscUs = us;
+    s_plDiscN = n;
+}
+
 void PortBenchFrameEnd(void)
 {
     const unsigned long long end = port_monotonic_ns();
@@ -293,6 +334,7 @@ void PortBenchFrameEnd(void)
     s_lastFrameUs = (unsigned int)(frame / 1000ull);
     s_lastSleepUs = (unsigned int)((s_sleepThisFrame + preSleep) / 1000ull);
     s_frameCounter++;
+    bench_periodic_log(end, s_lastBusyUs, s_lastFrameUs);
 
     s_liveBusyUs[s_liveNext] = s_lastBusyUs;
     s_liveFrameUs[s_liveNext] = s_lastFrameUs;
