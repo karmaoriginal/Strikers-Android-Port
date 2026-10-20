@@ -274,10 +274,10 @@ void PortBenchGetLive(PortBenchLive* out)
 // Diagnostico: uma linha a cada ~5 s no log com o que o jogo esta fazendo (fps, tempo de quadro,
 // tempo ocupado, pior quadro e leitura do disco). Mostra se o gargalo e CPU, GPU ou disco.
 extern void PortDiscGetStats(unsigned long long* bytes, unsigned long long* us, unsigned long long* calls);
-static unsigned long long s_plT0, s_plFrames, s_plBusy, s_plFrame, s_plWorst;
+static unsigned long long s_plT0, s_plFrames, s_plBusy, s_plFrame, s_plWorst, s_plPresent;
 static unsigned long long s_plDiscB, s_plDiscUs, s_plDiscN;
 
-static void bench_periodic_log(unsigned long long nowNs, unsigned int busyUs, unsigned int frameUs)
+static void bench_periodic_log(unsigned long long nowNs, unsigned int busyUs, unsigned int frameUs, unsigned int presentUs)
 {
     unsigned long long b, us, n;
     double secs, frames;
@@ -291,6 +291,7 @@ static void bench_periodic_log(unsigned long long nowNs, unsigned int busyUs, un
     s_plFrames++;
     s_plBusy += busyUs;
     s_plFrame += frameUs;
+    s_plPresent += presentUs;
     if (frameUs > s_plWorst)
         s_plWorst = frameUs;
     if (nowNs - s_plT0 < 5000000000ull)
@@ -305,8 +306,17 @@ static void bench_periodic_log(unsigned long long nowNs, unsigned int busyUs, un
             (double)s_plBusy / frames / 1000.0, (double)s_plWorst / 1000.0,
             (double)(b - s_plDiscB) / 1048576.0, n - s_plDiscN, (double)(us - s_plDiscUs) / 1000.0,
             s_matchActive);
+    {
+        const PortAuroraStatsHead* st = (aurora_get_stats != NULL) ? aurora_get_stats() : NULL;
+        if (st != NULL)
+            fprintf(stderr,
+                    "[perf2] present %.1f ms | draws %u (merged %u) | pipelines %u (queued %u) | vert %u KB | tex upload %u KB\n",
+                    (double)s_plPresent / frames / 1000.0, st->drawCallCount, st->mergedDrawCallCount,
+                    st->createdPipelines, st->queuedPipelines, st->lastVertSize / 1024u,
+                    st->lastTextureUploadSize / 1024u);
+    }
     s_plT0 = nowNs;
-    s_plFrames = s_plBusy = s_plFrame = s_plWorst = 0;
+    s_plFrames = s_plBusy = s_plFrame = s_plWorst = s_plPresent = 0;
     s_plDiscB = b;
     s_plDiscUs = us;
     s_plDiscN = n;
@@ -334,7 +344,7 @@ void PortBenchFrameEnd(void)
     s_lastFrameUs = (unsigned int)(frame / 1000ull);
     s_lastSleepUs = (unsigned int)((s_sleepThisFrame + preSleep) / 1000ull);
     s_frameCounter++;
-    bench_periodic_log(end, s_lastBusyUs, s_lastFrameUs);
+    bench_periodic_log(end, s_lastBusyUs, s_lastFrameUs, s_lastPresentUs);
 
     s_liveBusyUs[s_liveNext] = s_lastBusyUs;
     s_liveFrameUs[s_liveNext] = s_lastFrameUs;
